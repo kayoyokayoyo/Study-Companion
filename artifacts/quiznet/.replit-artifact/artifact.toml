@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "QuizNET"
+version = "1.0.0"
+id = "artifacts/quiznet"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22574
+
+[services.development]
+run = "pnpm --filter @workspace/quiznet run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/quiznet", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/quiznet/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22574"
+BASE_PATH = "/"

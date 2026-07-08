@@ -3,20 +3,32 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: QuizNET API - Plateforme d'entraînement aux QCM
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: courses
+    description: Course management
+  - name: eval-types
+    description: Evaluation type management
+  - name: quizzes
+    description: Quiz management
+  - name: questions
+    description: Question management
+  - name: stats
+    description: Statistics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +36,436 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthStatus"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getAuthMe
+      tags: [auth]
+      summary: Get current auth status
+      responses:
+        "200":
+          description: Auth status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthStatus"
+
+  /courses:
+    get:
+      operationId: listCourses
+      tags: [courses]
+      summary: List all courses
+      responses:
+        "200":
+          description: List of courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+    post:
+      operationId: createCourse
+      tags: [courses]
+      summary: Create a course
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+
+  /courses/{courseId}:
+    get:
+      operationId: getCourse
+      tags: [courses]
+      summary: Get a course by ID
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Course
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateCourse
+      tags: [courses]
+      summary: Update a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+    delete:
+      operationId: deleteCourse
+      tags: [courses]
+      summary: Delete a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /eval-types:
+    get:
+      operationId: listEvalTypes
+      tags: [eval-types]
+      summary: List all evaluation types
+      responses:
+        "200":
+          description: List of eval types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EvalType"
+    post:
+      operationId: createEvalType
+      tags: [eval-types]
+      summary: Create an evaluation type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvalTypeInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvalType"
+
+  /eval-types/{evalTypeId}:
+    put:
+      operationId: updateEvalType
+      tags: [eval-types]
+      summary: Update an evaluation type
+      parameters:
+        - name: evalTypeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvalTypeInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvalType"
+    delete:
+      operationId: deleteEvalType
+      tags: [eval-types]
+      summary: Delete an evaluation type
+      parameters:
+        - name: evalTypeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /quizzes:
+    get:
+      operationId: listQuizzes
+      tags: [quizzes]
+      summary: List quizzes with optional filters
+      parameters:
+        - name: courseId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: evalTypeId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: List of quizzes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QuizSummary"
+    post:
+      operationId: createQuiz
+      tags: [quizzes]
+      summary: Create a quiz
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuizInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizSummary"
+
+  /quizzes/{quizId}:
+    get:
+      operationId: getQuiz
+      tags: [quizzes]
+      summary: Get a quiz with all questions
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Quiz with questions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateQuiz
+      tags: [quizzes]
+      summary: Update a quiz
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuizInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizSummary"
+    delete:
+      operationId: deleteQuiz
+      tags: [quizzes]
+      summary: Delete a quiz
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /quizzes/{quizId}/import:
+    post:
+      operationId: importQuestions
+      tags: [quizzes]
+      summary: Import questions into a quiz from JSON
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportPayload"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+
+  /questions:
+    post:
+      operationId: createQuestion
+      tags: [questions]
+      summary: Add a question to a quiz
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+
+  /questions/{questionId}:
+    put:
+      operationId: updateQuestion
+      tags: [questions]
+      summary: Update a question
+      parameters:
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+    delete:
+      operationId: deleteQuestion
+      tags: [questions]
+      summary: Delete a question
+      parameters:
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Get global statistics
+      responses:
+        "200":
+          description: Statistics overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsOverview"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +476,326 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    LoginInput:
+      type: object
+      properties:
+        password:
+          type: string
+      required:
+        - password
+
+    AuthStatus:
+      type: object
+      properties:
+        isAdmin:
+          type: boolean
+      required:
+        - isAdmin
+
+    Course:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        quizCount:
+          type: integer
+        questionCount:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - quizCount
+        - questionCount
+        - createdAt
+
+    CourseInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: ["string", "null"]
+      required:
+        - name
+
+    EvalType:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        quizCount:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - quizCount
+        - createdAt
+
+    EvalTypeInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+      required:
+        - name
+
+    QuizSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        courseId:
+          type: integer
+        courseName:
+          type: string
+        evalTypeId:
+          type: integer
+        evalTypeName:
+          type: string
+        questionCount:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - title
+        - courseId
+        - courseName
+        - evalTypeId
+        - evalTypeName
+        - questionCount
+        - createdAt
+
+    QuizInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: ["string", "null"]
+        courseId:
+          type: integer
+        evalTypeId:
+          type: integer
+      required:
+        - title
+        - courseId
+        - evalTypeId
+
+    Choice:
+      type: object
+      properties:
+        id:
+          type: integer
+        text:
+          type: string
+        isCorrect:
+          type: boolean
+      required:
+        - id
+        - text
+        - isCorrect
+
+    Question:
+      type: object
+      properties:
+        id:
+          type: integer
+        quizId:
+          type: integer
+        type:
+          type: string
+          enum: [mcq, direct]
+        text:
+          type: string
+        explanation:
+          type: ["string", "null"]
+        orderIndex:
+          type: integer
+        choices:
+          type: array
+          items:
+            $ref: "#/components/schemas/Choice"
+        directAnswer:
+          type: ["string", "null"]
+      required:
+        - id
+        - quizId
+        - type
+        - text
+        - orderIndex
+        - choices
+
+    ChoiceInput:
+      type: object
+      properties:
+        text:
+          type: string
+        isCorrect:
+          type: boolean
+      required:
+        - text
+        - isCorrect
+
+    QuestionInput:
+      type: object
+      properties:
+        quizId:
+          type: integer
+        type:
+          type: string
+          enum: [mcq, direct]
+        text:
+          type: string
+          minLength: 1
+        explanation:
+          type: ["string", "null"]
+        orderIndex:
+          type: ["integer", "null"]
+        choices:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChoiceInput"
+        directAnswer:
+          type: ["string", "null"]
+      required:
+        - quizId
+        - type
+        - text
+
+    QuizDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        courseId:
+          type: integer
+        courseName:
+          type: string
+        evalTypeId:
+          type: integer
+        evalTypeName:
+          type: string
+        questionCount:
+          type: integer
+        createdAt:
+          type: string
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+      required:
+        - id
+        - title
+        - courseId
+        - courseName
+        - evalTypeId
+        - evalTypeName
+        - questionCount
+        - createdAt
+        - questions
+
+    ImportPayload:
+      type: object
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuestionInput"
+      required:
+        - questions
+
+    ImportResult:
+      type: object
+      properties:
+        imported:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+      required:
+        - imported
+        - errors
+
+    CourseStats:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        quizCount:
+          type: integer
+        questionCount:
+          type: integer
+      required:
+        - id
+        - name
+        - quizCount
+        - questionCount
+
+    StatsOverview:
+      type: object
+      properties:
+        totalCourses:
+          type: integer
+        totalQuizzes:
+          type: integer
+        totalQuestions:
+          type: integer
+        totalEvalTypes:
+          type: integer
+        mcqCount:
+          type: integer
+        directCount:
+          type: integer
+        topCourses:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseStats"
+      required:
+        - totalCourses
+        - totalQuizzes
+        - totalQuestions
+        - totalEvalTypes
+        - mcqCount
+        - directCount
+        - topCourses
