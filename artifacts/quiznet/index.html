@@ -1,21 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>QuizNET</title>
-    <meta name="description" content="QuizNET — built on Replit. Update this description to reflect the app." />
+    <meta name="description" content="QuizNET — Révisez vos cours avec des QCM et questions directes, organisés par cours et type d'évaluation." />
     <meta name="robots" content="index, follow" />
     <meta property="og:title" content="QuizNET" />
-    <meta property="og:description" content="QuizNET — built on Replit. Update this description to reflect the app." />
+    <meta property="og:description" content="La plateforme de révision pour les étudiants." />
     <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="QuizNET" />
-    <meta name="twitter:description" content="QuizNET — built on Replit. Update this description to reflect the app." />
+    <meta name="twitter:description" content="La plateforme de révision pour les étudiants." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Prevent flash of wrong theme -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("quiznet_theme");
+          if (t === "dark" || (!t && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

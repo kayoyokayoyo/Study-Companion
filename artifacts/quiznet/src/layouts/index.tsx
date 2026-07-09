@@ -2,21 +2,24 @@ import { useState } from "react"
 import { Link, useLocation } from "wouter"
 import {
   GraduationCap, LayoutDashboard, Library, FileText,
-  Settings, BookOpen, Menu, LogOut, MessageSquare
+  Settings, BookOpen, Menu, LogOut, MessageSquare, Info, Settings2
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { NotificationBell } from "@/components/notification-bell"
 import { SuggestionModal } from "@/components/suggestion-modal"
-import { useGetAuthMe, useLogout } from "@workspace/api-client-react"
+import { ThemeToggle } from "@/components/theme-toggle"
+import { GlobalSearch } from "@/components/global-search"
+import { useLogout } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 
 // ─── Student Layout ───────────────────────────────────────────────────────────
 
 const studentLinks = [
-  { href: "/", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
-  { href: "/courses", label: "Mes cours", icon: Library },
+  { href: "/",        label: "Tableau de bord", icon: LayoutDashboard, exact: true },
+  { href: "/courses", label: "Mes cours",        icon: Library },
+  { href: "/about",   label: "À propos",         icon: Info },
 ]
 
 function StudentNavLink({
@@ -32,7 +35,9 @@ function StudentNavLink({
       onClick={onClick}
       className={cn(
         "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-        active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+        active
+          ? "bg-primary/10 text-primary"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
       )}
     >
       <Icon className="w-4 h-4 shrink-0" />
@@ -50,8 +55,8 @@ function StudentSidebarContent({ onNavClick }: { onNavClick?: () => void }) {
         </div>
         <span className="font-bold text-xl tracking-tight">QuizNET</span>
       </div>
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {studentLinks.map((l) => (
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
+        {studentLinks.map(l => (
           <StudentNavLink key={l.href} {...l} onClick={onNavClick} />
         ))}
       </nav>
@@ -67,7 +72,7 @@ export function StudentLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
-      {/* Desktop sidebar — sticky full-height */}
+      {/* Desktop sidebar */}
       <aside className="hidden md:flex w-64 border-r border-border bg-card flex-col flex-shrink-0 sticky top-0 h-screen overflow-y-auto">
         <StudentSidebarContent />
       </aside>
@@ -81,7 +86,9 @@ export function StudentLayout({ children }: { children: React.ReactNode }) {
             </div>
             <span className="font-bold text-base tracking-tight">QuizNET</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
+            <GlobalSearch />
+            <ThemeToggle />
             <NotificationBell />
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
@@ -96,8 +103,10 @@ export function StudentLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Desktop topbar — slim, notification bell + right edge */}
-        <div className="hidden md:flex sticky top-0 z-20 bg-background/80 backdrop-blur border-b px-6 h-11 items-center justify-end gap-2">
+        {/* Desktop topbar */}
+        <div className="hidden md:flex sticky top-0 z-20 bg-background/80 backdrop-blur border-b px-6 h-11 items-center justify-end gap-1">
+          <GlobalSearch />
+          <ThemeToggle />
           <SuggestionModal variant="inline" />
           <NotificationBell />
         </div>
@@ -113,11 +122,12 @@ export function StudentLayout({ children }: { children: React.ReactNode }) {
 // ─── Admin Layout ─────────────────────────────────────────────────────────────
 
 const adminLinks = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/courses", label: "Cours", icon: BookOpen },
+  { href: "/admin/dashboard",  label: "Dashboard",          icon: LayoutDashboard },
+  { href: "/admin/courses",    label: "Cours",              icon: BookOpen },
   { href: "/admin/eval-types", label: "Types d'évaluation", icon: FileText },
-  { href: "/admin/quizzes", label: "Quizz", icon: Library },
-  { href: "/admin/suggestions", label: "Suggestions", icon: MessageSquare },
+  { href: "/admin/quizzes",    label: "Quizz",              icon: Library },
+  { href: "/admin/suggestions",label: "Suggestions",        icon: MessageSquare },
+  { href: "/admin/settings",   label: "Paramètres",         icon: Settings2 },
 ]
 
 function AdminNavLink({
@@ -177,8 +187,8 @@ function AdminSidebarContent({
           <div className="text-xs text-muted-foreground">Administration</div>
         </div>
       </div>
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {adminLinks.map((l) => (
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
+        {adminLinks.map(l => (
           <AdminNavLink
             key={l.href}
             {...l}
@@ -187,7 +197,11 @@ function AdminSidebarContent({
           />
         ))}
       </nav>
-      <div className="px-3 pb-4 border-t pt-3">
+      <div className="px-3 pb-4 border-t pt-3 space-y-1">
+        <div className="flex items-center justify-between px-3 py-1">
+          <span className="text-xs text-muted-foreground">Apparence</span>
+          <ThemeToggle />
+        </div>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
@@ -201,8 +215,7 @@ function AdminSidebarContent({
 }
 
 export function AdminLayout({
-  children,
-  unreadSuggestions,
+  children, unreadSuggestions,
 }: {
   children: React.ReactNode; unreadSuggestions?: number
 }) {
@@ -224,12 +237,13 @@ export function AdminLayout({
             </div>
             <span className="font-bold text-base tracking-tight">Admin</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             {(unreadSuggestions ?? 0) > 0 && (
               <span className="min-w-[20px] h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
                 {unreadSuggestions}
               </span>
             )}
+            <ThemeToggle />
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">

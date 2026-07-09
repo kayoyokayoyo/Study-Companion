@@ -1,13 +1,46 @@
 import os
+import json
 import hmac
 import hashlib
 from functools import wraps
 from flask import request, jsonify
 
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
 SESSION_SECRET = os.environ.get("SESSION_SECRET", "quiznet-default-secret-change-me")
 COOKIE_NAME = "quiznet_auth"
 _TOKEN_MSG = b"quiznet_admin_v1"
+_SECURE_COOKIE = os.environ.get("FLASK_ENV", "development") == "production"
+
+_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+
+def _load_config() -> dict:
+    try:
+        if os.path.exists(_CONFIG_PATH):
+            with open(_CONFIG_PATH) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
+def _save_config(data: dict) -> None:
+    existing = _load_config()
+    existing.update(data)
+    try:
+        with open(_CONFIG_PATH, "w") as f:
+            json.dump(existing, f, indent=2)
+    except Exception as e:
+        print(f"Config save error: {e}")
+
+
+def get_admin_password() -> str:
+    """Always reads from config file first, then env, then default."""
+    config = _load_config()
+    return config.get("admin_password") or os.environ.get("ADMIN_PASSWORD", "admin123")
+
+
+def update_admin_password(new_password: str) -> None:
+    _save_config({"admin_password": new_password})
 
 
 def generate_token() -> str:

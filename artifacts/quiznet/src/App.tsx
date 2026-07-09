@@ -4,30 +4,34 @@ import { Toaster } from '@/components/ui/toaster'
 import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter'
 import { useGetAuthMe } from "@workspace/api-client-react"
 import { useQuery } from "@tanstack/react-query"
+import { ThemeProvider } from "@/hooks/use-theme"
 
 import { StudentLayout, AdminLayout } from '@/layouts'
 
-// Lazy-loaded pages
-const StudentHome       = lazy(() => import('@/pages/public/home').then(m => ({ default: m.StudentHome })))
-const StudentCourses    = lazy(() => import('@/pages/public/courses').then(m => ({ default: m.StudentCourses })))
+// Lazy-loaded pages — student
+const StudentHome         = lazy(() => import('@/pages/public/home').then(m => ({ default: m.StudentHome })))
+const StudentCourses      = lazy(() => import('@/pages/public/courses').then(m => ({ default: m.StudentCourses })))
 const StudentCourseDetail = lazy(() => import('@/pages/public/course-detail').then(m => ({ default: m.StudentCourseDetail })))
-const StudentTrainQuiz  = lazy(() => import('@/pages/public/train').then(m => ({ default: m.StudentTrainQuiz })))
-const StudentReadQuiz   = lazy(() => import('@/pages/public/read').then(m => ({ default: m.StudentReadQuiz })))
+const StudentTrainQuiz    = lazy(() => import('@/pages/public/train').then(m => ({ default: m.StudentTrainQuiz })))
+const StudentReadQuiz     = lazy(() => import('@/pages/public/read').then(m => ({ default: m.StudentReadQuiz })))
+const AboutPage           = lazy(() => import('@/pages/public/about').then(m => ({ default: m.AboutPage })))
 
-const AdminLogin        = lazy(() => import('@/pages/admin/login').then(m => ({ default: m.AdminLogin })))
-const AdminDashboard    = lazy(() => import('@/pages/admin/dashboard').then(m => ({ default: m.AdminDashboard })))
-const AdminCourses      = lazy(() => import('@/pages/admin/courses').then(m => ({ default: m.AdminCourses })))
-const AdminEvalTypes    = lazy(() => import('@/pages/admin/eval-types').then(m => ({ default: m.AdminEvalTypes })))
-const AdminQuizzes      = lazy(() => import('@/pages/admin/quizzes').then(m => ({ default: m.AdminQuizzes })))
-const AdminQuestions    = lazy(() => import('@/pages/admin/questions').then(m => ({ default: m.AdminQuestions })))
-const AdminSuggestions  = lazy(() => import('@/pages/admin/suggestions').then(m => ({ default: m.AdminSuggestions })))
-const NotFound          = lazy(() => import('@/pages/not-found'))
+// Lazy-loaded pages — admin
+const AdminLogin       = lazy(() => import('@/pages/admin/login').then(m => ({ default: m.AdminLogin })))
+const AdminDashboard   = lazy(() => import('@/pages/admin/dashboard').then(m => ({ default: m.AdminDashboard })))
+const AdminCourses     = lazy(() => import('@/pages/admin/courses').then(m => ({ default: m.AdminCourses })))
+const AdminEvalTypes   = lazy(() => import('@/pages/admin/eval-types').then(m => ({ default: m.AdminEvalTypes })))
+const AdminQuizzes     = lazy(() => import('@/pages/admin/quizzes').then(m => ({ default: m.AdminQuizzes })))
+const AdminQuestions   = lazy(() => import('@/pages/admin/questions').then(m => ({ default: m.AdminQuestions })))
+const AdminSuggestions = lazy(() => import('@/pages/admin/suggestions').then(m => ({ default: m.AdminSuggestions })))
+const AdminSettings    = lazy(() => import('@/pages/admin/settings').then(m => ({ default: m.AdminSettings })))
+const NotFound         = lazy(() => import('@/pages/not-found'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5,   // 5 min — avoids redundant refetches
-      gcTime:    1000 * 60 * 10,  // 10 min cache retention
+      staleTime: 1000 * 60 * 5,
+      gcTime:    1000 * 60 * 10,
       retry: 1,
       refetchOnWindowFocus: false,
     },
@@ -47,12 +51,8 @@ function PageLoader() {
 function ProtectedAdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { data: auth, isLoading } = useGetAuthMe()
   const [, setLocation] = useLocation()
-
   if (isLoading) return <PageLoader />
-  if (!auth?.isAdmin) {
-    setLocation('/admin')
-    return null
-  }
+  if (!auth?.isAdmin) { setLocation('/admin'); return null }
   return <Component />
 }
 
@@ -65,7 +65,6 @@ function AdminLayoutWrapper({ children }: { children: React.ReactNode }) {
         .then((data: { isRead: boolean }[]) => data.filter(s => !s.isRead).length),
     staleTime: 1000 * 30,
   })
-
   return <AdminLayout unreadSuggestions={suggestions ?? 0}>{children}</AdminLayout>
 }
 
@@ -73,66 +72,48 @@ function Router() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>
-        {/* Admin Login */}
-        <Route path="/admin">
-          <AdminLogin />
-        </Route>
+        {/* Admin login */}
+        <Route path="/admin"><AdminLogin /></Route>
 
-        {/* Admin Routes */}
+        {/* Admin routes */}
         <Route path="/admin/dashboard">
-          <AdminLayoutWrapper>
-            <ProtectedAdminRoute component={AdminDashboard} />
-          </AdminLayoutWrapper>
+          <AdminLayoutWrapper><ProtectedAdminRoute component={AdminDashboard} /></AdminLayoutWrapper>
         </Route>
         <Route path="/admin/courses">
-          <AdminLayoutWrapper>
-            <ProtectedAdminRoute component={AdminCourses} />
-          </AdminLayoutWrapper>
+          <AdminLayoutWrapper><ProtectedAdminRoute component={AdminCourses} /></AdminLayoutWrapper>
         </Route>
         <Route path="/admin/eval-types">
-          <AdminLayoutWrapper>
-            <ProtectedAdminRoute component={AdminEvalTypes} />
-          </AdminLayoutWrapper>
+          <AdminLayoutWrapper><ProtectedAdminRoute component={AdminEvalTypes} /></AdminLayoutWrapper>
         </Route>
         <Route path="/admin/quizzes">
-          <AdminLayoutWrapper>
-            <ProtectedAdminRoute component={AdminQuizzes} />
-          </AdminLayoutWrapper>
+          <AdminLayoutWrapper><ProtectedAdminRoute component={AdminQuizzes} /></AdminLayoutWrapper>
         </Route>
         <Route path="/admin/quizzes/:quizId/questions">
-          <AdminLayoutWrapper>
-            <ProtectedAdminRoute component={AdminQuestions} />
-          </AdminLayoutWrapper>
+          <AdminLayoutWrapper><ProtectedAdminRoute component={AdminQuestions} /></AdminLayoutWrapper>
         </Route>
         <Route path="/admin/suggestions">
-          <AdminLayoutWrapper>
-            <ProtectedAdminRoute component={AdminSuggestions} />
-          </AdminLayoutWrapper>
+          <AdminLayoutWrapper><ProtectedAdminRoute component={AdminSuggestions} /></AdminLayoutWrapper>
+        </Route>
+        <Route path="/admin/settings">
+          <AdminLayoutWrapper><ProtectedAdminRoute component={AdminSettings} /></AdminLayoutWrapper>
         </Route>
 
-        {/* Full-screen quiz modes */}
-        <Route path="/quiz/:quizId/train">
-          <StudentTrainQuiz />
-        </Route>
-        <Route path="/quiz/:quizId/read">
-          <StudentReadQuiz />
-        </Route>
+        {/* Full-screen quiz modes (no layout wrapper) */}
+        <Route path="/quiz/:quizId/train"><StudentTrainQuiz /></Route>
+        <Route path="/quiz/:quizId/read"><StudentReadQuiz /></Route>
 
-        {/* Student Routes */}
+        {/* Student routes */}
+        <Route path="/about">
+          <StudentLayout><AboutPage /></StudentLayout>
+        </Route>
         <Route path="/">
-          <StudentLayout>
-            <StudentHome />
-          </StudentLayout>
+          <StudentLayout><StudentHome /></StudentLayout>
         </Route>
         <Route path="/courses">
-          <StudentLayout>
-            <StudentCourses />
-          </StudentLayout>
+          <StudentLayout><StudentCourses /></StudentLayout>
         </Route>
         <Route path="/courses/:courseId">
-          <StudentLayout>
-            <StudentCourseDetail />
-          </StudentLayout>
+          <StudentLayout><StudentCourseDetail /></StudentLayout>
         </Route>
 
         <Route component={NotFound} />
@@ -143,12 +124,14 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-        <Router />
-      </WouterRouter>
-      <Toaster />
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+          <Router />
+        </WouterRouter>
+        <Toaster />
+      </QueryClientProvider>
+    </ThemeProvider>
   )
 }
 
