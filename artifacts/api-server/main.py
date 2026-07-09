@@ -38,7 +38,16 @@ _DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "quiznet"
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_spa(path: str):
-    """Serve the built React SPA. API routes take precedence (registered above)."""
+    """Serve the built React SPA.
+
+    Flask resolves blueprint routes BEFORE this catch-all, so all /api/* routes
+    that actually exist are handled by their blueprints. Only unknown /api/* paths
+    reach here — they get a proper JSON 404 instead of index.html.
+    """
+    # Return a JSON 404 for unknown /api/* paths (never serve the SPA for API calls)
+    if path == "api" or path.startswith("api/"):
+        return jsonify({"error": "Not found"}), 404
+
     # If the dist folder doesn't exist, show a helpful message
     if not os.path.isdir(_DIST):
         return (
@@ -52,7 +61,7 @@ def serve_spa(path: str):
     if path and os.path.isfile(candidate):
         return send_from_directory(_DIST, path)
 
-    # SPA fallback — let React Router (wouter) handle the path
+    # SPA fallback — let wouter handle client-side routing
     return send_from_directory(_DIST, "index.html")
 
 

@@ -5,10 +5,21 @@ import hashlib
 from functools import wraps
 from flask import request, jsonify
 
-SESSION_SECRET = os.environ.get("SESSION_SECRET", "quiznet-default-secret-change-me")
+_RAW_SECRET = os.environ.get("SESSION_SECRET", "")
+_IS_PRODUCTION = os.environ.get("FLASK_ENV", "development") == "production"
+
+# Fail loudly in production if SESSION_SECRET is missing — a weak secret would
+# allow anyone who can read the source code to forge an admin cookie.
+if _IS_PRODUCTION and not _RAW_SECRET:
+    raise RuntimeError(
+        "SESSION_SECRET environment variable is required in production. "
+        "Set it to a long random string (e.g. openssl rand -hex 32)."
+    )
+
+SESSION_SECRET = _RAW_SECRET or "quiznet-dev-only-secret-do-not-use-in-prod"
 COOKIE_NAME = "quiznet_auth"
 _TOKEN_MSG = b"quiznet_admin_v1"
-_SECURE_COOKIE = os.environ.get("FLASK_ENV", "development") == "production"
+_SECURE_COOKIE = _IS_PRODUCTION
 
 _CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 
