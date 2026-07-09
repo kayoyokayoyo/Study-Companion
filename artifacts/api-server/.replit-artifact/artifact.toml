@@ -10,7 +10,7 @@ name = "API Server"
 paths = ["/api"]
 
 [services.development]
-run = "uvicorn main:app --host 0.0.0.0 --port $PORT --reload --app-dir /home/runner/workspace/artifacts/api-server"
+run = "python /home/runner/workspace/artifacts/api-server/main.py"
 
 [services.production]
 
@@ -18,7 +18,7 @@ run = "uvicorn main:app --host 0.0.0.0 --port $PORT --reload --app-dir /home/run
 args = ["sh", "-c", "pip install -r /home/runner/workspace/artifacts/api-server/requirements.txt -q"]
 
 [services.production.run]
-args = ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--app-dir", "/home/runner/workspace/artifacts/api-server"]
+args = ["python", "/home/runner/workspace/artifacts/api-server/main.py"]
 
 [services.production.run.env]
 PORT = "8080"

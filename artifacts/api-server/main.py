@@ -1,54 +1,52 @@
 import os
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from flask import Flask, jsonify
+from flask_cors import CORS
 from database import engine, Base
 from routers import auth, courses, eval_types, quizzes, questions, stats, suggestions
 from seed import seed_default_data
 
+app = Flask(__name__)
+app.url_map.strict_slashes = False
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+CORS(app, supports_credentials=True, origins="*")
+
+# Initialize DB tables and seed on startup
+with app.app_context():
     Base.metadata.create_all(bind=engine)
     seed_default_data()
-    yield
+
+# Register blueprints
+app.register_blueprint(auth.bp,         url_prefix="/api/auth")
+app.register_blueprint(courses.bp,      url_prefix="/api/courses")
+app.register_blueprint(eval_types.bp,   url_prefix="/api/eval-types")
+app.register_blueprint(quizzes.bp,      url_prefix="/api/quizzes")
+app.register_blueprint(questions.bp,    url_prefix="/api/questions")
+app.register_blueprint(stats.bp,        url_prefix="/api/stats")
+app.register_blueprint(suggestions.bp,  url_prefix="/api/suggestions")
 
 
-app = FastAPI(title="QuizNET API", version="1.0.0", lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"error": exc.detail},
-    )
-
-
-app.include_router(auth.router, prefix="/api/auth")
-app.include_router(courses.router, prefix="/api/courses")
-app.include_router(eval_types.router, prefix="/api/eval-types")
-app.include_router(quizzes.router, prefix="/api/quizzes")
-app.include_router(questions.router, prefix="/api/questions")
-app.include_router(stats.router, prefix="/api/stats")
-app.include_router(suggestions.router, prefix="/api/suggestions")
-
-
-@app.get("/api/healthz")
+@app.route("/api/healthz")
 def health_check():
-    return {"status": "ok"}
+    return jsonify({"status": "ok"})
+
+
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"error": "Not found"}), 404
+
+
+@app.errorhandler(405)
+def method_not_allowed(e):
+    return jsonify({"error": "Method not allowed"}), 405
+
+
+@app.errorhandler(Exception)
+def internal_error(e):
+    import traceback
+    traceback.print_exc()
+    return jsonify({"error": "Internal server error"}), 500
 
 
 if __name__ == "__main__":
-    import uvicorn
     port = int(os.environ.get("PORT", 8080))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    app.run(host="0.0.0.0", port=port, debug=True)

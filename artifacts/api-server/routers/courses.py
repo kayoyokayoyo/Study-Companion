@@ -1,28 +1,19 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from flask import Blueprint, request, jsonify
 from sqlalchemy import func
-from pydantic import BaseModel
-from database import get_db
+from database import SessionLocal
 from models import Course, Quiz, Question
 from auth_utils import require_admin
 
-router = APIRouter()
+bp = Blueprint("courses", __name__)
 
 
-class CourseInput(BaseModel):
-    name: str
-    description: Optional[str] = None
-
-
-def build_course_response(db: Session, course: Course) -> dict:
+def build_course_response(db, course) -> dict:
     quiz_count = db.query(func.count(Quiz.id)).filter(Quiz.course_id == course.id).scalar() or 0
     question_count = (
         db.query(func.count(Question.id))
         .join(Quiz, Question.quiz_id == Quiz.id)
         .filter(Quiz.course_id == course.id)
-        .scalar()
-        or 0
+        .scalar() or 0
     )
     return {
         "id": course.id,
@@ -34,46 +25,74 @@ def build_course_response(db: Session, course: Course) -> dict:
     }
 
 
-@router.get("")
-def list_courses(db: Session = Depends(get_db)):
-    courses = db.query(Course).order_by(Course.name).all()
-    return [build_course_response(db, c) for c in courses]
+@bp.route("", methods=["GET"])
+def list_courses():
+    db = SessionLocal()
+    try:
+        courses = db.query(Course).order_by(Course.name).all()
+        return jsonify([build_course_response(db, c) for c in courses])
+    finally:
+        db.close()
 
 
-@router.post("", status_code=201, dependencies=[Depends(require_admin)])
-def create_course(data: CourseInput, db: Session = Depends(get_db)):
-    course = Course(name=data.name, description=data.description)
-    db.add(course)
-    db.commit()
-    db.refresh(course)
-    return build_course_response(db, course)
+@bp.route("", methods=["POST"])
+@require_admin
+def create_course():
+    db = SessionLocal()
+    try:
+        data = request.get_json(silent=True) or {}
+        name = (data.get("name") or "").strip()
+        if not name:
+            return jsonify({"error": "Name is required"}), 422
+        course = Course(name=name, description=data.get("description"))
+        db.add(course)
+        db.commit()
+        db.refresh(course)
+        return jsonify(build_course_response(db, course)), 201
+    finally:
+        db.close()
 
 
-@router.get("/{course_id}")
-def get_course(course_id: int, db: Session = Depends(get_db)):
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    return build_course_response(db, course)
+@bp.route("/<int:course_id>", methods=["GET"])
+def get_course(course_id):
+    db = SessionLocal()
+    try:
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            return jsonify({"error": "Course not found"}), 404
+        return jsonify(build_course_response(db, course))
+    finally:
+        db.close()
 
 
-@router.put("/{course_id}", dependencies=[Depends(require_admin)])
-def update_course(course_id: int, data: CourseInput, db: Session = Depends(get_db)):
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    course.name = data.name
-    course.description = data.description
-    db.commit()
-    db.refresh(course)
-    return build_course_response(db, course)
+@bp.route("/<int:course_id>", methods=["PUT"])
+@require_admin
+def update_course(course_id):
+    db = SessionLocal()
+    try:
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            return jsonify({"error": "Course not found"}), 404
+        data = request.get_json(silent=True) or {}
+        course.name = data.get("name", course.name)
+        course.description = data.get("description", course.description)
+        db.commit()
+        db.refresh(course)
+        return jsonify(build_course_response(db, course))
+    finally:
+        db.close()
 
 
-@router.delete("/{course_id}", dependencies=[Depends(require_admin)])
-def delete_course(course_id: int, db: Session = Depends(get_db)):
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    db.delete(course)
-    db.commit()
-    return {"success": True}
+@bp.route("/<int:course_id>", methods=["DELETE"])
+@require_admin
+def delete_course(course_id):
+    db = SessionLocal()
+    try:
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            return jsonify({"error": "Course not found"}), 404
+        db.delete(course)
+        db.commit()
+        return jsonify({"success": True})
+    finally:
+        db.close()

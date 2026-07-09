@@ -1,37 +1,39 @@
-from fastapi import APIRouter, Request, Response
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+import os
+from flask import Blueprint, request, jsonify, make_response
 from auth_utils import ADMIN_PASSWORD, COOKIE_NAME, generate_token, is_admin
 
-router = APIRouter()
+_SECURE_COOKIE = os.environ.get("FLASK_ENV", "development") == "production"
+
+bp = Blueprint("auth", __name__)
 
 
-class LoginInput(BaseModel):
-    password: str
-
-
-@router.post("/login")
-def login(data: LoginInput, response: Response):
-    if data.password != ADMIN_PASSWORD:
-        return JSONResponse(status_code=401, content={"error": "Invalid credentials"})
+@bp.route("/login", methods=["POST"])
+def login():
+    data = request.get_json(silent=True) or {}
+    password = data.get("password", "")
+    if password != ADMIN_PASSWORD:
+        return jsonify({"error": "Invalid credentials"}), 401
     token = generate_token()
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=token,
+    resp = make_response(jsonify({"isAdmin": True}))
+    resp.set_cookie(
+        COOKIE_NAME,
+        token,
         httponly=True,
-        samesite="lax",
+        secure=_SECURE_COOKIE,
+        samesite="Lax",
         max_age=7 * 24 * 3600,
         path="/",
     )
-    return {"isAdmin": True}
+    return resp
 
 
-@router.post("/logout")
-def logout(response: Response):
-    response.delete_cookie(key=COOKIE_NAME, path="/")
-    return {"success": True}
+@bp.route("/logout", methods=["POST"])
+def logout():
+    resp = make_response(jsonify({"success": True}))
+    resp.delete_cookie(COOKIE_NAME, path="/")
+    return resp
 
 
-@router.get("/me")
-def get_me(request: Request):
-    return {"isAdmin": is_admin(request)}
+@bp.route("/me", methods=["GET"])
+def get_me():
+    return jsonify({"isAdmin": is_admin()})

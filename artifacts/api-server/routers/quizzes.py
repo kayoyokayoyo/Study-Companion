@@ -1,46 +1,17 @@
-from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from flask import Blueprint, request, jsonify
 from sqlalchemy import func
-from pydantic import BaseModel
-from database import get_db
+from database import SessionLocal
 from models import Quiz, Course, EvalType, Question, Choice
 from auth_utils import require_admin
 
-router = APIRouter()
+bp = Blueprint("quizzes", __name__)
 
 
-class QuizInput(BaseModel):
-    title: str
-    description: Optional[str] = None
-    courseId: int
-    evalTypeId: int
-
-
-class ChoiceImport(BaseModel):
-    text: str
-    isCorrect: bool
-
-
-class QuestionImport(BaseModel):
-    quizId: Optional[int] = None
-    type: str
-    text: str
-    explanation: Optional[str] = None
-    orderIndex: Optional[int] = None
-    choices: Optional[List[ChoiceImport]] = []
-    directAnswer: Optional[str] = None
-
-
-class ImportPayload(BaseModel):
-    questions: List[QuestionImport]
-
-
-def build_choice(c: Choice) -> dict:
+def build_choice(c) -> dict:
     return {"id": c.id, "text": c.text, "isCorrect": c.is_correct}
 
 
-def build_question(q: Question) -> dict:
+def build_question(q) -> dict:
     return {
         "id": q.id,
         "quizId": q.quiz_id,
@@ -53,7 +24,7 @@ def build_question(q: Question) -> dict:
     }
 
 
-def build_quiz_summary(quiz: Quiz) -> dict:
+def build_quiz_summary(quiz) -> dict:
     return {
         "id": quiz.id,
         "title": quiz.title,
@@ -67,124 +38,154 @@ def build_quiz_summary(quiz: Quiz) -> dict:
     }
 
 
-@router.get("")
-def list_quizzes(
-    courseId: Optional[int] = None,
-    evalTypeId: Optional[int] = None,
-    db: Session = Depends(get_db),
-):
-    query = db.query(Quiz)
-    if courseId is not None:
-        query = query.filter(Quiz.course_id == courseId)
-    if evalTypeId is not None:
-        query = query.filter(Quiz.eval_type_id == evalTypeId)
-    quizzes = query.order_by(Quiz.created_at.desc()).all()
-    return [build_quiz_summary(q) for q in quizzes]
+@bp.route("", methods=["GET"])
+def list_quizzes():
+    db = SessionLocal()
+    try:
+        course_id = request.args.get("courseId", type=int)
+        eval_type_id = request.args.get("evalTypeId", type=int)
+        q = db.query(Quiz)
+        if course_id is not None:
+            q = q.filter(Quiz.course_id == course_id)
+        if eval_type_id is not None:
+            q = q.filter(Quiz.eval_type_id == eval_type_id)
+        quizzes = q.order_by(Quiz.created_at.desc()).all()
+        return jsonify([build_quiz_summary(quiz) for quiz in quizzes])
+    finally:
+        db.close()
 
 
-@router.post("", status_code=201, dependencies=[Depends(require_admin)])
-def create_quiz(data: QuizInput, db: Session = Depends(get_db)):
-    course = db.query(Course).filter(Course.id == data.courseId).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    et = db.query(EvalType).filter(EvalType.id == data.evalTypeId).first()
-    if not et:
-        raise HTTPException(status_code=404, detail="Eval type not found")
-    quiz = Quiz(
-        title=data.title,
-        description=data.description,
-        course_id=data.courseId,
-        eval_type_id=data.evalTypeId,
-    )
-    db.add(quiz)
-    db.commit()
-    db.refresh(quiz)
-    return build_quiz_summary(quiz)
+@bp.route("", methods=["POST"])
+@require_admin
+def create_quiz():
+    db = SessionLocal()
+    try:
+        data = request.get_json(silent=True) or {}
+        course = db.query(Course).filter(Course.id == data.get("courseId")).first()
+        if not course:
+            return jsonify({"error": "Course not found"}), 404
+        et = db.query(EvalType).filter(EvalType.id == data.get("evalTypeId")).first()
+        if not et:
+            return jsonify({"error": "Eval type not found"}), 404
+        quiz = Quiz(
+            title=data.get("title", ""),
+            description=data.get("description"),
+            course_id=data.get("courseId"),
+            eval_type_id=data.get("evalTypeId"),
+        )
+        db.add(quiz)
+        db.commit()
+        db.refresh(quiz)
+        return jsonify(build_quiz_summary(quiz)), 201
+    finally:
+        db.close()
 
 
-@router.get("/{quiz_id}")
-def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
-    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
-    if not quiz:
-        raise HTTPException(status_code=404, detail="Quiz not found")
-    result = build_quiz_summary(quiz)
-    result["questions"] = [
-        build_question(q)
-        for q in sorted(quiz.questions, key=lambda x: x.order_index)
-    ]
-    return result
+@bp.route("/<int:quiz_id>", methods=["GET"])
+def get_quiz(quiz_id):
+    db = SessionLocal()
+    try:
+        quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+        if not quiz:
+            return jsonify({"error": "Quiz not found"}), 404
+        result = build_quiz_summary(quiz)
+        result["questions"] = [
+            build_question(q)
+            for q in sorted(quiz.questions, key=lambda x: x.order_index)
+        ]
+        return jsonify(result)
+    finally:
+        db.close()
 
 
-@router.put("/{quiz_id}", dependencies=[Depends(require_admin)])
-def update_quiz(quiz_id: int, data: QuizInput, db: Session = Depends(get_db)):
-    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
-    if not quiz:
-        raise HTTPException(status_code=404, detail="Quiz not found")
-    course = db.query(Course).filter(Course.id == data.courseId).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    et = db.query(EvalType).filter(EvalType.id == data.evalTypeId).first()
-    if not et:
-        raise HTTPException(status_code=404, detail="Eval type not found")
-    quiz.title = data.title
-    quiz.description = data.description
-    quiz.course_id = data.courseId
-    quiz.eval_type_id = data.evalTypeId
-    db.commit()
-    db.refresh(quiz)
-    return build_quiz_summary(quiz)
+@bp.route("/<int:quiz_id>", methods=["PUT"])
+@require_admin
+def update_quiz(quiz_id):
+    db = SessionLocal()
+    try:
+        quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+        if not quiz:
+            return jsonify({"error": "Quiz not found"}), 404
+        data = request.get_json(silent=True) or {}
+        course = db.query(Course).filter(Course.id == data.get("courseId")).first()
+        if not course:
+            return jsonify({"error": "Course not found"}), 404
+        et = db.query(EvalType).filter(EvalType.id == data.get("evalTypeId")).first()
+        if not et:
+            return jsonify({"error": "Eval type not found"}), 404
+        quiz.title = data.get("title", quiz.title)
+        quiz.description = data.get("description", quiz.description)
+        quiz.course_id = data.get("courseId", quiz.course_id)
+        quiz.eval_type_id = data.get("evalTypeId", quiz.eval_type_id)
+        db.commit()
+        db.refresh(quiz)
+        return jsonify(build_quiz_summary(quiz))
+    finally:
+        db.close()
 
 
-@router.delete("/{quiz_id}", dependencies=[Depends(require_admin)])
-def delete_quiz(quiz_id: int, db: Session = Depends(get_db)):
-    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
-    if not quiz:
-        raise HTTPException(status_code=404, detail="Quiz not found")
-    db.delete(quiz)
-    db.commit()
-    return {"success": True}
+@bp.route("/<int:quiz_id>", methods=["DELETE"])
+@require_admin
+def delete_quiz(quiz_id):
+    db = SessionLocal()
+    try:
+        quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+        if not quiz:
+            return jsonify({"error": "Quiz not found"}), 404
+        db.delete(quiz)
+        db.commit()
+        return jsonify({"success": True})
+    finally:
+        db.close()
 
 
-@router.post("/{quiz_id}/import", dependencies=[Depends(require_admin)])
-def import_questions(quiz_id: int, payload: ImportPayload, db: Session = Depends(get_db)):
-    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
-    if not quiz:
-        raise HTTPException(status_code=404, detail="Quiz not found")
+@bp.route("/<int:quiz_id>/import", methods=["POST"])
+@require_admin
+def import_questions(quiz_id):
+    db = SessionLocal()
+    try:
+        quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+        if not quiz:
+            return jsonify({"error": "Quiz not found"}), 404
 
-    imported = 0
-    errors: List[str] = []
-    current_max = (
-        db.query(func.max(Question.order_index)).filter(Question.quiz_id == quiz_id).scalar()
-        or -1
-    )
+        payload = request.get_json(silent=True) or {}
+        questions_data = payload.get("questions", [])
 
-    for i, qdata in enumerate(payload.questions):
-        try:
-            current_max += 1
-            order = qdata.orderIndex if qdata.orderIndex is not None else current_max
-            question = Question(
-                quiz_id=quiz_id,
-                type=qdata.type,
-                text=qdata.text,
-                explanation=qdata.explanation,
-                order_index=order,
-                direct_answer=qdata.directAnswer,
-            )
-            db.add(question)
-            db.flush()
+        imported = 0
+        errors = []
+        current_max = (
+            db.query(func.max(Question.order_index))
+            .filter(Question.quiz_id == quiz_id)
+            .scalar() or -1
+        )
 
-            if qdata.type == "mcq" and qdata.choices:
-                for cdata in qdata.choices:
-                    db.add(
-                        Choice(
+        for i, qdata in enumerate(questions_data):
+            try:
+                current_max += 1
+                order = qdata.get("orderIndex") if qdata.get("orderIndex") is not None else current_max
+                question = Question(
+                    quiz_id=quiz_id,
+                    type=qdata.get("type", "mcq"),
+                    text=qdata.get("text", ""),
+                    explanation=qdata.get("explanation"),
+                    order_index=order,
+                    direct_answer=qdata.get("directAnswer"),
+                )
+                db.add(question)
+                db.flush()
+
+                if qdata.get("type") == "mcq" and qdata.get("choices"):
+                    for cdata in qdata["choices"]:
+                        db.add(Choice(
                             question_id=question.id,
-                            text=cdata.text,
-                            is_correct=cdata.isCorrect,
-                        )
-                    )
-            imported += 1
-        except Exception as e:
-            errors.append(f"Question {i + 1}: {str(e)}")
+                            text=cdata.get("text", ""),
+                            is_correct=cdata.get("isCorrect", False),
+                        ))
+                imported += 1
+            except Exception as e:
+                errors.append(f"Question {i + 1}: {str(e)}")
 
-    db.commit()
-    return {"imported": imported, "errors": errors}
+        db.commit()
+        return jsonify({"imported": imported, "errors": errors})
+    finally:
+        db.close()

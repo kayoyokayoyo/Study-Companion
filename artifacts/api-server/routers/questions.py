@@ -1,31 +1,13 @@
-from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from flask import Blueprint, request, jsonify
 from sqlalchemy import func
-from pydantic import BaseModel
-from database import get_db
+from database import SessionLocal
 from models import Question, Choice, Quiz
 from auth_utils import require_admin
 
-router = APIRouter()
+bp = Blueprint("questions", __name__)
 
 
-class ChoiceInput(BaseModel):
-    text: str
-    isCorrect: bool
-
-
-class QuestionInput(BaseModel):
-    quizId: int
-    type: str  # "mcq" or "direct"
-    text: str
-    explanation: Optional[str] = None
-    orderIndex: Optional[int] = None
-    choices: Optional[List[ChoiceInput]] = []
-    directAnswer: Optional[str] = None
-
-
-def build_question(q: Question) -> dict:
+def build_question(q) -> dict:
     return {
         "id": q.id,
         "quizId": q.quiz_id,
@@ -41,74 +23,98 @@ def build_question(q: Question) -> dict:
     }
 
 
-@router.post("", status_code=201, dependencies=[Depends(require_admin)])
-def create_question(data: QuestionInput, db: Session = Depends(get_db)):
-    quiz = db.query(Quiz).filter(Quiz.id == data.quizId).first()
-    if not quiz:
-        raise HTTPException(status_code=404, detail="Quiz not found")
+@bp.route("", methods=["POST"])
+@require_admin
+def create_question():
+    db = SessionLocal()
+    try:
+        data = request.get_json(silent=True) or {}
+        quiz = db.query(Quiz).filter(Quiz.id == data.get("quizId")).first()
+        if not quiz:
+            return jsonify({"error": "Quiz not found"}), 404
 
-    if data.orderIndex is None:
-        max_order = (
-            db.query(func.max(Question.order_index))
-            .filter(Question.quiz_id == data.quizId)
-            .scalar()
+        order_index = data.get("orderIndex")
+        if order_index is None:
+            max_order = (
+                db.query(func.max(Question.order_index))
+                .filter(Question.quiz_id == data.get("quizId"))
+                .scalar()
+            )
+            order_index = (max_order or -1) + 1
+
+        question = Question(
+            quiz_id=data.get("quizId"),
+            type=data.get("type", "mcq"),
+            text=data.get("text", ""),
+            explanation=data.get("explanation"),
+            order_index=order_index,
+            direct_answer=data.get("directAnswer"),
         )
-        order = (max_order or -1) + 1
-    else:
-        order = data.orderIndex
+        db.add(question)
+        db.flush()
 
-    question = Question(
-        quiz_id=data.quizId,
-        type=data.type,
-        text=data.text,
-        explanation=data.explanation,
-        order_index=order,
-        direct_answer=data.directAnswer,
-    )
-    db.add(question)
-    db.flush()
+        if data.get("type") == "mcq" and data.get("choices"):
+            for cdata in data["choices"]:
+                db.add(Choice(
+                    question_id=question.id,
+                    text=cdata.get("text", ""),
+                    is_correct=cdata.get("isCorrect", False),
+                ))
 
-    if data.type == "mcq" and data.choices:
-        for cdata in data.choices:
-            db.add(Choice(question_id=question.id, text=cdata.text, is_correct=cdata.isCorrect))
-
-    db.commit()
-    db.refresh(question)
-    return build_question(question)
+        db.commit()
+        db.refresh(question)
+        return jsonify(build_question(question)), 201
+    finally:
+        db.close()
 
 
-@router.put("/{question_id}", dependencies=[Depends(require_admin)])
-def update_question(question_id: int, data: QuestionInput, db: Session = Depends(get_db)):
-    question = db.query(Question).filter(Question.id == question_id).first()
-    if not question:
-        raise HTTPException(status_code=404, detail="Question not found")
+@bp.route("/<int:question_id>", methods=["PUT"])
+@require_admin
+def update_question(question_id):
+    db = SessionLocal()
+    try:
+        question = db.query(Question).filter(Question.id == question_id).first()
+        if not question:
+            return jsonify({"error": "Question not found"}), 404
 
-    question.type = data.type
-    question.text = data.text
-    question.explanation = data.explanation
-    question.direct_answer = data.directAnswer
-    if data.orderIndex is not None:
-        question.order_index = data.orderIndex
+        data = request.get_json(silent=True) or {}
+        question.type = data.get("type", question.type)
+        question.text = data.get("text", question.text)
+        question.explanation = data.get("explanation", question.explanation)
+        question.direct_answer = data.get("directAnswer", question.direct_answer)
+        if data.get("orderIndex") is not None:
+            question.order_index = data["orderIndex"]
 
-    # Replace choices
-    for c in list(question.choices):
-        db.delete(c)
-    db.flush()
+        # Replace choices
+        for c in list(question.choices):
+            db.delete(c)
+        db.flush()
 
-    if data.type == "mcq" and data.choices:
-        for cdata in data.choices:
-            db.add(Choice(question_id=question.id, text=cdata.text, is_correct=cdata.isCorrect))
+        if data.get("type") == "mcq" and data.get("choices"):
+            for cdata in data["choices"]:
+                db.add(Choice(
+                    question_id=question.id,
+                    text=cdata.get("text", ""),
+                    is_correct=cdata.get("isCorrect", False),
+                ))
 
-    db.commit()
-    db.refresh(question)
-    return build_question(question)
+        db.commit()
+        db.refresh(question)
+        return jsonify(build_question(question))
+    finally:
+        db.close()
 
 
-@router.delete("/{question_id}", dependencies=[Depends(require_admin)])
-def delete_question(question_id: int, db: Session = Depends(get_db)):
-    question = db.query(Question).filter(Question.id == question_id).first()
-    if not question:
-        raise HTTPException(status_code=404, detail="Question not found")
-    db.delete(question)
-    db.commit()
-    return {"success": True}
+@bp.route("/<int:question_id>", methods=["DELETE"])
+@require_admin
+def delete_question(question_id):
+    db = SessionLocal()
+    try:
+        question = db.query(Question).filter(Question.id == question_id).first()
+        if not question:
+            return jsonify({"error": "Question not found"}), 404
+        db.delete(question)
+        db.commit()
+        return jsonify({"success": True})
+    finally:
+        db.close()

@@ -1,21 +1,12 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from database import get_db
+from flask import Blueprint, request, jsonify
+from database import SessionLocal
 from models import Suggestion
 from auth_utils import require_admin
 
-router = APIRouter()
+bp = Blueprint("suggestions", __name__)
 
 
-class SuggestionInput(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
-    message: str
-
-
-def build_suggestion(s: Suggestion) -> dict:
+def build_suggestion(s) -> dict:
     return {
         "id": s.id,
         "name": s.name,
@@ -26,42 +17,63 @@ def build_suggestion(s: Suggestion) -> dict:
     }
 
 
-@router.post("", status_code=201)
-def create_suggestion(data: SuggestionInput, db: Session = Depends(get_db)):
-    if not data.message.strip():
-        raise HTTPException(status_code=422, detail="Message cannot be empty")
-    suggestion = Suggestion(
-        name=data.name or None,
-        email=data.email or None,
-        message=data.message.strip(),
-    )
-    db.add(suggestion)
-    db.commit()
-    db.refresh(suggestion)
-    return {"success": True, "id": suggestion.id}
+@bp.route("", methods=["POST"])
+def create_suggestion():
+    db = SessionLocal()
+    try:
+        data = request.get_json(silent=True) or {}
+        message = (data.get("message") or "").strip()
+        if not message:
+            return jsonify({"error": "Message cannot be empty"}), 422
+        suggestion = Suggestion(
+            name=data.get("name") or None,
+            email=data.get("email") or None,
+            message=message,
+        )
+        db.add(suggestion)
+        db.commit()
+        db.refresh(suggestion)
+        return jsonify({"success": True, "id": suggestion.id}), 201
+    finally:
+        db.close()
 
 
-@router.get("", dependencies=[Depends(require_admin)])
-def list_suggestions(db: Session = Depends(get_db)):
-    items = db.query(Suggestion).order_by(Suggestion.created_at.desc()).all()
-    return [build_suggestion(s) for s in items]
+@bp.route("", methods=["GET"])
+@require_admin
+def list_suggestions():
+    db = SessionLocal()
+    try:
+        items = db.query(Suggestion).order_by(Suggestion.created_at.desc()).all()
+        return jsonify([build_suggestion(s) for s in items])
+    finally:
+        db.close()
 
 
-@router.patch("/{suggestion_id}/read", dependencies=[Depends(require_admin)])
-def mark_read(suggestion_id: int, db: Session = Depends(get_db)):
-    s = db.query(Suggestion).filter(Suggestion.id == suggestion_id).first()
-    if not s:
-        raise HTTPException(status_code=404, detail="Suggestion not found")
-    s.is_read = True
-    db.commit()
-    return {"success": True}
+@bp.route("/<int:suggestion_id>/read", methods=["PATCH"])
+@require_admin
+def mark_read(suggestion_id):
+    db = SessionLocal()
+    try:
+        s = db.query(Suggestion).filter(Suggestion.id == suggestion_id).first()
+        if not s:
+            return jsonify({"error": "Suggestion not found"}), 404
+        s.is_read = True
+        db.commit()
+        return jsonify({"success": True})
+    finally:
+        db.close()
 
 
-@router.delete("/{suggestion_id}", dependencies=[Depends(require_admin)])
-def delete_suggestion(suggestion_id: int, db: Session = Depends(get_db)):
-    s = db.query(Suggestion).filter(Suggestion.id == suggestion_id).first()
-    if not s:
-        raise HTTPException(status_code=404, detail="Suggestion not found")
-    db.delete(s)
-    db.commit()
-    return {"success": True}
+@bp.route("/<int:suggestion_id>", methods=["DELETE"])
+@require_admin
+def delete_suggestion(suggestion_id):
+    db = SessionLocal()
+    try:
+        s = db.query(Suggestion).filter(Suggestion.id == suggestion_id).first()
+        if not s:
+            return jsonify({"error": "Suggestion not found"}), 404
+        db.delete(s)
+        db.commit()
+        return jsonify({"success": True})
+    finally:
+        db.close()
