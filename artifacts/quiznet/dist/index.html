@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>QuizNET</title>
+    <meta name="description" content="QuizNET — Révisez vos cours avec des QCM et questions directes, organisés par cours et type d'évaluation." />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:title" content="QuizNET" />
+    <meta property="og:description" content="La plateforme de révision pour les étudiants." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="QuizNET" />
+    <meta name="twitter:description" content="La plateforme de révision pour les étudiants." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Prevent flash of wrong theme -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("quiznet_theme");
+          if (t === "dark" || (!t && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-CWiTb8qL.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/ui-HY1SLvcW.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-B0o0bz_I.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

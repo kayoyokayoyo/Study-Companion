@@ -1,7 +1,9 @@
 # See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
-# compiled output
+# compiled output (tous les dossiers dist sauf le build de production du frontend)
 dist
+!artifacts/quiznet/dist/
+!artifacts/quiznet/dist/**
 tmp
 out-tsc
 *.tsbuildinfo
